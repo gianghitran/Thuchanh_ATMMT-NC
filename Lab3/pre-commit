@@ -1,0 +1,46 @@
+#!/bin/bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}--- BẮT ĐẦU QUY TRÌNH KIỂM TRA BẢO MẬT (SNYK) ---${NC}"
+
+#Quét lỗi trong code và tìm kiếm các API keys, mật khẩu bị lộ
+echo -e "\n${YELLOW}[1/3] Đang quét mã nguồn (Snyk Code)...${NC}"
+snyk code test
+if [ $? -ne 0 ]; then
+    echo -e "${RED}LỖI: Tìm thấy vấn đề bảo mật trong mã nguồn hoặc lộ thông tin nhạy cảm!${NC}"
+    exit 1
+fi
+
+# 2. Kiểm tra Snyk Open Source (SCA)
+# Quét các thư viện bên thứ ba (Dependencies)
+echo -e "\n${YELLOW}[2/3] Đang quét thư viện (Snyk Open Source)...${NC}"
+snyk test
+if [ $? -ne 0 ]; then
+    echo -e "${RED}LỖI: Tìm thấy lỗ hổng trong các thư viện (dependencies)!${NC}"
+    exit 1
+fi
+
+# 3. Kiểm tra Snyk Infrastructure as Code (IaC) - Chỉ chạy nếu có file cấu hình
+# Tìm kiếm các file .yaml, .tf, .json để quét cấu hình hạ tầng
+echo -e "\n${YELLOW}[3/3] Đang quét cấu hình hạ tầng (Snyk IaC)...${NC}"
+# Tìm xem có file cấu hình nào không trước khi quét để tránh tốn thời gian
+if ls *.yaml *.yml *.tf *.json >/dev/null 2>&1; then
+    snyk iac test
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}LỖI: Cấu hình hạ tầng (IaC) không an toàn!${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}Bỏ qua: Không tìm thấy file cấu hình hạ tầng (YAML, Terraform, JSON).${NC}"
+fi
+
+# Nếu vượt qua tất cả
+echo -e "\n${GREEN}=======================================================${NC}"
+echo -e "${GREEN}THÀNH CÔNG: Mọi kiểm tra bảo mật đều đạt chuẩn!${NC}"
+echo -e "${GREEN}Đang thực hiện commit...${NC}"
+echo -e "${GREEN}=======================================================${NC}"
+exit 0
